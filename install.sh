@@ -86,6 +86,7 @@ if command -v pi >/dev/null 2>&1; then
     "npm:@ff-labs/pi-fff"
     "npm:pi-rtk-optimizer"
     "npm:@plannotator/pi-extension"
+    "git:github.com/NVlabs/SoL-Pi"
   )
   for pkg in "${PI_PACKAGES[@]}"; do
     echo "  Installing $pkg..."
@@ -135,6 +136,13 @@ if [ ! -f "$PI_AGENT_DIR/APPEND_SYSTEM.md" ]; then
   cp "$SCRIPT_DIR/pi/APPEND_SYSTEM.md" "$PI_AGENT_DIR/APPEND_SYSTEM.md"
   echo "  ✓ Installed $PI_AGENT_DIR/APPEND_SYSTEM.md"
 fi
+
+for cfg in open-tui.json optimizer.json sol-pi.json; do
+  if [ ! -f "$PI_AGENT_DIR/$cfg" ] && [ -f "$SCRIPT_DIR/pi/$cfg" ]; then
+    cp "$SCRIPT_DIR/pi/$cfg" "$PI_AGENT_DIR/$cfg"
+    echo "  ✓ Installed $PI_AGENT_DIR/$cfg"
+  fi
+done
 
 # 9. Install VS Code / Cursor Extension
 echo ""

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "actionFusion": true,
+  "observationPack": true,
+  "evidencePreservingReducer": true,
+  "evidencePreservingReducerProvider": "4router-anthropic",
+  "evidencePreservingReducerModel": "claude-haiku-5-5",
+  "onlineContextCompact": false
+}
