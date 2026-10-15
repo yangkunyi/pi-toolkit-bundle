@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -e
+
+PREFIX="${1:-$(basename "$PWD")}"
+
+echo "==> Initializing beads repository with prefix '$PREFIX'..."
+
+if [ ! -d ".beads" ]; then
+  bd init --prefix "$PREFIX" --non-interactive
+  echo "✓ beads database initialized in .beads/"
+else
+  echo "✓ .beads directory already exists."
+fi
+
+if [ ! -f "AGENTS.md" ]; then
+  cat << 'AGENTS_EOF' > AGENTS.md
+# Agent Instructions
+
+This project uses **bd** (beads) for issue tracking. Run \`bd prime\` for full workflow context.
+
+## Quick Reference
+
+\`\`\`bash
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --claim  # Claim work atomically
+bd close <id>         # Complete work
+bd dolt push          # Push beads data to remote
+\`\`\`
+AGENTS_EOF
+  echo "✓ Created AGENTS.md with bd instructions."
+fi
+
+echo "✓ Cairn workspace initialized successfully!"
+echo "Now run your agent or open VS Code with Cairn extension installed."

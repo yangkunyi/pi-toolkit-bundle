@@ -1,0 +1,36 @@
+{
+  "compaction": {
+    "enabled": false
+  },
+  "defaultThinkingLevel": "high",
+  "enableSkillCommands": true,
+  "packages": [
+    "npm:pi-subagents",
+    "npm:pi-web-access",
+    "npm:@companion-ai/feynman@0.5.35",
+    "npm:billion-context",
+    "npm:pi-lens",
+    "npm:pi-simplify",
+    "npm:pi-open-tui",
+    "npm:@juicesharp/rpiv-ask-user-question",
+    "npm:@narumitw/pi-btw",
+    "npm:pi-hashline-edit-pro",
+    "npm:@ff-labs/pi-fff"
+  ],
+  "theme": "system",
+  "tuiMode": "fullscreen",
+  "fullscreenCopyOnSelect": true,
+  "defaultTools": [
+    "+codemode"
+  ],
+  "terminal": {
+    "showTerminalProgress": true,
+    "images": "kitty"
+  },
+  "hideThinkingBlock": true,
+  "editorPaddingX": 1,
+  "outputPad": 1,
+  "markdown": {
+    "mermaid": "final"
+  }
+}

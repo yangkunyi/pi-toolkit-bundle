@@ -1,0 +1,44 @@
+{
+  "compaction": {
+    "enabled": false
+  },
+  "defaultProvider": "magpie",
+  "defaultModel": "fluxtoken-gemini/gemini-3.8-flash",
+  "defaultThinkingLevel": "xhigh",
+  "enableSkillCommands": true,
+  "packages": [
+    "npm:pi-subagents",
+    "npm:@plannotator/pi-extension",
+    "npm:pi-web-access",
+    "git:github.com/NVlabs/SoL-Pi",
+    "npm:@companion-ai/feynman@0.5.35",
+    "npm:billion-context",
+    "npm:pi-lens",
+    "../../beads-dashboard/pi-extension",
+    "npm:pi-simplify",
+    "npm:pi-open-tui",
+    "npm:@juicesharp/rpiv-ask-user-question",
+    "npm:@narumitw/pi-btw",
+    "npm:pi-hashline-edit-pro",
+    "npm:@ff-labs/pi-fff",
+    "/data3/yky/pi-sidekick",
+    "npm:pi-rtk-optimizer"
+  ],
+  "lastChangelogVersion": "1.2.0",
+  "theme": "system",
+  "tuiMode": "fullscreen",
+  "fullscreenCopyOnSelect": true,
+  "defaultTools": [
+    "+codemode"
+  ],
+  "terminal": {
+    "showTerminalProgress": true,
+    "images": "kitty"
+  },
+  "hideThinkingBlock": true,
+  "editorPaddingX": 1,
+  "outputPad": 1,
+  "markdown": {
+    "mermaid": "final"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "providers": {
+    "openai": {
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": "${OPENAI_API_KEY}",
+      "models": [
+        {
+          "id": "gpt-4o",
+          "name": "GPT-4o",
+          "maxTokens": 16384
+        }
+      ]
+    },
+    "anthropic": {
+      "baseUrl": "https://api.anthropic.com/v1",
+      "apiKey": "${ANTHROPIC_API_KEY}",
+      "models": [
+        {
+          "id": "claude-3-5-sonnet-20241022",
+          "name": "Claude 3.5 Sonnet",
+          "maxTokens": 8192
+        }
+      ]
+    },
+    "magpie": {
+      "baseUrl": "http://127.0.0.1:3425/v1",
+      "apiKey": "magpie",
+      "models": [
+        {
+          "id": "fluxtoken-gemini/gemini-3.8-flash",
+          "name": "Gemini 3.8 Flash (Local Gateway)",
+          "maxTokens": 65536
+        }
+      ]
+    }
+  }
+}

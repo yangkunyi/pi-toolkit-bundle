@@ -1,0 +1,15 @@
+{
+  "name": "cairn-pi",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cairn for pi: the recording tools, the recorded state in the system prompt, the settle check and the Cairn skills, as a local pi package.",
+  "keywords": ["pi-package"],
+  "pi": {
+    "extensions": ["./dist/cairn.js"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
+}
