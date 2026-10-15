@@ -22,10 +22,24 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 echo "✓ Node.js $(node -v) detected."
 
-# 2. Check / Guide Pi
+# 2. Check / Install Beads (bd)
+if ! command -v bd >/dev/null 2>&1; then
+  echo "⚠ 'bd' (Beads CLI) not found. Installing via official script..."
+  curl -fsSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash || {
+    echo "⚠ curl installer failed, trying npm install -g @beads/bd..."
+    npm install -g @beads/bd || echo "✗ Failed to install bd automatically. Please install it manually."
+  }
+fi
+
+if command -v bd >/dev/null 2>&1; then
+  echo "✓ bd detected: $(bd --version 2>/dev/null || echo 'installed')"
+else
+  echo "⚠ bd still not detected on PATH. Make sure ~/.local/bin or npm bin is in your PATH."
+fi
+
+# 3. Check / Install Pi
 if ! command -v pi >/dev/null 2>&1; then
-  echo "⚠ Warning: 'pi' command not found."
-  echo "  Installing @earendil-works/pi-coding-agent globally..."
+  echo "⚠ 'pi' command not found. Installing @earendil-works/pi-coding-agent globally..."
   npm install -g @earendil-works/pi-coding-agent || {
     echo "✗ Failed to install pi automatically. Please install pi manually:"
     echo "  npm install -g @earendil-works/pi-coding-agent"
@@ -36,17 +50,6 @@ if command -v pi >/dev/null 2>&1; then
   echo "✓ pi detected: $(pi --version 2>/dev/null || echo 'installed')"
 else
   echo "⚠ Continuing without pi on PATH. You can install it later."
-fi
-
-# 3. Check / Guide Beads (bd)
-if command -v bd >/dev/null 2>&1; then
-  echo "✓ bd detected: $(bd --version 2>/dev/null || echo 'installed')"
-else
-  echo "⚠ Notice: 'bd' (beads) command not found."
-  echo "  Cairn uses bd under the hood to store and query issue graphs and decisions."
-  echo "  Installation options:"
-  echo "    macOS:  brew install steveyegge/beads/bd"
-  echo "    Linux/other: see https://github.com/steveyegge/beads"
 fi
 
 # 4. Install Cairn Extension into Pi
@@ -65,13 +68,37 @@ if command -v pi >/dev/null 2>&1; then
   pi install "$SCRIPT_DIR/sidekick" || echo "⚠ pi install sidekick failed"
 fi
 
-# 6. Link Cairn CLI binaries to ~/.local/bin
+# 5b. Install Ecosystem Extensions into Pi
 echo ""
-echo "--> Linking cairn CLI tools to $BIN_DIR..."
+echo "--> Installing Ecosystem Pi extensions..."
+if command -v pi >/dev/null 2>&1; then
+  PI_PACKAGES=(
+    "npm:pi-subagents"
+    "npm:pi-web-access"
+    "npm:@companion-ai/feynman@0.5.35"
+    "npm:billion-context"
+    "npm:pi-lens"
+    "npm:pi-simplify"
+    "npm:pi-open-tui"
+    "npm:@juicesharp/rpiv-ask-user-question"
+    "npm:@narumitw/pi-btw"
+    "npm:pi-hashline-edit-pro"
+    "npm:@ff-labs/pi-fff"
+    "npm:pi-rtk-optimizer"
+    "npm:@plannotator/pi-extension"
+  )
+  for pkg in "${PI_PACKAGES[@]}"; do
+    echo "  Installing $pkg..."
+    pi install "$pkg" || echo "  ⚠ Failed to install $pkg (skipped)"
+  done
+fi
+
+# 6. Link Cairn CLI binary to ~/.local/bin
+echo ""
+echo "--> Linking cairn CLI tool to $BIN_DIR..."
 ln -sf "$SCRIPT_DIR/cairn/bin/cairn" "$BIN_DIR/cairn"
-ln -sf "$SCRIPT_DIR/cairn/bin/cairn-init" "$BIN_DIR/cairn-init"
-chmod +x "$SCRIPT_DIR/cairn/bin/cairn" "$SCRIPT_DIR/cairn/bin/cairn-init"
-echo "✓ Linked 'cairn' and 'cairn-init' to $BIN_DIR"
+chmod +x "$SCRIPT_DIR/cairn/bin/cairn"
+echo "✓ Linked 'cairn' to $BIN_DIR"
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
   echo "  Note: Ensure $BIN_DIR is in your PATH (e.g. export PATH=\"\$HOME/.local/bin:\$PATH\")"
 fi
@@ -148,7 +175,7 @@ echo "========================================================"
 echo "Next Steps:"
 echo "1. Initialize any project repository:"
 echo "     cd /path/to/your/git-repo"
-echo "     cairn-init"
+echo "     cairn init"
 echo ""
 echo "2. Open the project in Pi coding agent:"
 echo "     pi"

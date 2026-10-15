@@ -18,8 +18,7 @@ pi-toolkit-bundle/
 │
 ├── cairn/                      # Cairn 决策系统套件（预编译产物）
 │   ├── bin/
-│   │   ├── cairn               # Cairn CLI 管理工具 (setup pi / check / remove)
-│   │   └── cairn-init          # 仓库快速初始化脚本 (自动配置 .beads 与 AGENTS.md)
+│   │   ├── cairn               # Cairn CLI 管理工具 (cairn init / setup pi / check)
 │   ├── pi-extension/           # Pi 原生扩展包 (cairn-pi)
 │   │   ├── dist/cairn.js       # 预编译好的单一 Bundle（含工具与提示词注入）
 │   │   └── package.json
@@ -80,7 +79,7 @@ cd pi-toolkit-bundle
 1. 检查 Node.js、pi、bd 环境。
 2. 安装 Cairn Pi 插件 (`pi install ./cairn/pi-extension`)。
 3. 安装 Pi Sidekick 插件 (`pi install ./sidekick`)。
-4. 将 `cairn` 和 `cairn-init` 软链到 `~/.local/bin/`。
+4. 将 `cairn` 软链到 `~/.local/bin/`。
 5. 将全局 Skills 安装至 `~/.agents/skills/` 与 `~/.pi/agent/skills/`。
 6. 初始化并更新 `~/.pi/agent/` 下的 `settings.json`、`AGENTS.md` 和 `APPEND_SYSTEM.md`。
 7. 检测并安装 VS Code / Cursor 的 `cairn-0.2.1.vsix` 插件。
@@ -99,7 +98,7 @@ cd pi-toolkit-bundle
 
 ```bash
 cd /path/to/your-project
-cairn-init
+cairn init
 ```
 
 这会自动：

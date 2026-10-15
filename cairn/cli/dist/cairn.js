@@ -5,20 +5,52 @@
 var import_node_child_process = require("node:child_process");
 var import_node_fs = require("node:fs");
 var import_node_os = require("node:os");
-var import_node_path3 = require("node:path");
+var import_node_path4 = require("node:path");
 
 // cli/src/dispatch.ts
-var import_node_path2 = require("node:path");
+var import_node_path3 = require("node:path");
+
+// cli/src/init.ts
+var import_node_path = require("node:path");
+function runInit(args, env) {
+  const bd = env.run(env.bd, ["--version"]);
+  if (!bd.ok) {
+    env.err(`bd did not run (${env.bd}). Cairn requires Beads (bd): install bd and put it on PATH.`);
+    return 1;
+  }
+  const beadsDir = (0, import_node_path.join)(env.cwd, ".beads");
+  if (env.exists(beadsDir)) {
+    env.out(`Cairn/Beads is already initialized in this repository (${beadsDir}).`);
+    return 0;
+  }
+  const initArgs = ["init", "--non-interactive"];
+  if (args.length === 1 && !args[0].startsWith("-")) {
+    initArgs.push("--prefix", args[0]);
+  } else {
+    initArgs.push(...args);
+  }
+  const result = env.run(env.bd, initArgs);
+  if (!result.ok) {
+    const msg = (result.stderr || result.stdout).trim();
+    env.err(`bd init failed: ${msg}`);
+    return 1;
+  }
+  for (const line of result.stdout.split(/\r?\n/).filter((l) => l.trim() !== "")) {
+    env.out(line);
+  }
+  env.out("\u2713 Cairn workspace initialized (.beads/). AI coding agents in Pi will automatically load Cairn tools.");
+  return 0;
+}
 
 // cli/src/setup-pi.ts
-var import_node_path = require("node:path");
+var import_node_path2 = require("node:path");
 function setupPaths(env) {
   return {
-    extensionDir: (0, import_node_path.join)(env.repoRoot, "pi-extension"),
-    bundle: (0, import_node_path.join)(env.repoRoot, "pi-extension", "dist", "cairn.js"),
-    skillsDir: (0, import_node_path.join)(env.repoRoot, "claude-plugin", "skills"),
-    legacyUser: (0, import_node_path.join)(env.agentDir, "extensions", "cairn.ts"),
-    legacyProject: (0, import_node_path.join)(env.cwd, ".pi", "extensions", "cairn.ts")
+    extensionDir: (0, import_node_path2.join)(env.repoRoot, "pi-extension"),
+    bundle: (0, import_node_path2.join)(env.repoRoot, "pi-extension", "dist", "cairn.js"),
+    skillsDir: (0, import_node_path2.join)(env.repoRoot, "claude-plugin", "skills"),
+    legacyUser: (0, import_node_path2.join)(env.agentDir, "extensions", "cairn.ts"),
+    legacyProject: (0, import_node_path2.join)(env.cwd, ".pi", "extensions", "cairn.ts")
   };
 }
 function listedPaths(listOutput) {
@@ -118,12 +150,12 @@ function failure(result) {
 // cli/src/dispatch.ts
 var USAGE = [
   "Usage:",
+  "  cairn init [prefix]       initialize Cairn and Beads in the current repository",
   "  cairn setup pi            install the Cairn pi package (runs pi install)",
   "  cairn setup pi --check    print one line per requirement; exit 0 when all required ones pass",
   "  cairn setup pi --remove   remove the Cairn pi package (runs pi remove)",
   "  cairn --version           print the version of the pi package",
-  "  cairn help                show this text",
-  "  cairn-go                  the previous Go cairn; it reads old .cairn/ logs"
+  "  cairn help                show this text"
 ].join("\n");
 function dispatch(argv, deps) {
   const env = { ...deps };
@@ -133,7 +165,7 @@ function dispatch(argv, deps) {
     return 0;
   }
   if (command === "--version" || command === "-v") {
-    const manifest = deps.readText((0, import_node_path2.join)(deps.repoRoot, "pi-extension", "package.json"));
+    const manifest = deps.readText((0, import_node_path3.join)(deps.repoRoot, "pi-extension", "package.json"));
     const version = manifest ? JSON.parse(manifest).version : void 0;
     if (typeof version !== "string") {
       deps.err("Could not read the version from pi-extension/package.json.");
@@ -141,6 +173,9 @@ function dispatch(argv, deps) {
     }
     deps.out(version);
     return 0;
+  }
+  if (command === "init") {
+    return runInit(rest, deps);
   }
   if (command === "setup" && rest[0] === "pi") {
     const mode = setupMode(rest.slice(1));
@@ -171,9 +206,9 @@ function runProgram(file, args) {
   return { ok: result.status === 0, code: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
 }
 process.exitCode = dispatch(process.argv.slice(2), {
-  repoRoot: (0, import_node_path3.resolve)(__dirname, "..", ".."),
+  repoRoot: (0, import_node_path4.resolve)(__dirname, "..", ".."),
   cwd: process.cwd(),
-  agentDir: process.env.PI_CODING_AGENT_DIR || (0, import_node_path3.resolve)((0, import_node_os.homedir)(), ".pi", "agent"),
+  agentDir: process.env.PI_CODING_AGENT_DIR || (0, import_node_path4.resolve)((0, import_node_os.homedir)(), ".pi", "agent"),
   bd: process.env.BD || "bd",
   run: runProgram,
   exists: import_node_fs.existsSync,
