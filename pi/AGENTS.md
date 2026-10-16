@@ -80,6 +80,11 @@ All project tasks, architectural decisions, and verified findings are managed vi
 
 ### 7. Delegation & Human Alignment
 - **`sidekick`**: Delegate heavy execution, boilerplate implementation, linter fixes, or test running to persistent slots (e.g. `sidekick({ name: "coder", task: "..." })`). Lead keeps architecture and review.
+  - **Zero Inspection Policy**: **NEVER** inspect `sidekick.js`, `pi-toolkit-bundle`, or `~/.pi/agent/sidekick/config.json`. All runtime capabilities, parameters, and defaults are completely defined in the tool declaration.
+  - **Model Specification**: Pass any supported model via `model: "provider/model[:thinking]"` (e.g. `magpie/fluxtoken/grok-4.7:xhigh`). If omitted, it automatically uses the configured sidekick model.
+  - **Persistent Slots**: Slot names (e.g. `coder`, `tester`, `grok`) keep independent shell sessions and context across calls.
+  - **Concurrency**: Calling `sidekick` with different slot names and `block: false` dispatches them in parallel in the background; you will be notified upon completion.
+  - **Status**: Call `sidekick({ task: "status" })` or pass `status: true` to check active slots and default model without running any subagent or reading files.
 - **`subagent`**: Ephemeral parallel read-only review, research, or council analysis.
 - **`ask_user_question`**: Use when encountering ambiguous requirements or irreversible operations needing operator confirmation.
 

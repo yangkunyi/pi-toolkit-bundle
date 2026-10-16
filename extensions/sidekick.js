@@ -207,44 +207,84 @@ async function dispatchSidekick(pi, stateManager, options) {
 }
 
 // src/tool.ts
-var SidekickParamsSchema = Type.Object({
-  task: Type.String({
-    description: "Concrete implementation, testing, debugging, or research brief for the sidekick."
-  }),
-  name: Type.Optional(
-    Type.String({
-      description: "Slot name for the persistent sidekick instance (e.g. 'coder', 'tester', 'docs'). Defaults to 'default'."
-    })
-  ),
-  model: Type.Optional(
-    Type.String({
-      description: "Optional model override as 'provider/id'. Defaults to the configured sidekick model."
-    })
-  ),
-  block: Type.Optional(
-    Type.Boolean({
-      description: "Whether to wait for completion synchronously. Defaults to false (async in background)."
-    })
-  ),
-  timeout: Type.Optional(
-    Type.Number({
-      description: "Optional timeout in seconds."
-    })
-  )
-});
 function registerSidekickTool(pi, stateManager) {
+  const currentModel = stateManager.getDefaultModel() || "auto (configured/inherited)";
+  const currentThinking = stateManager.getDefaultThinking() || "default";
+  const SidekickParamsSchema = Type.Object({
+    task: Type.String({
+      description: "Concrete implementation, testing, debugging, or research brief for the sidekick. Pass 'status' to inspect active slots and configuration."
+    }),
+    name: Type.Optional(
+      Type.String({
+        description: "Slot name for the persistent sidekick instance (e.g. 'coder', 'tester', 'grok'). Each slot maintains its own persistent session, state, and history. Defaults to 'default'."
+      })
+    ),
+    model: Type.Optional(
+      Type.String({
+        description: `Optional model override as 'provider/model[:thinking]' (e.g. 'magpie/fluxtoken/grok-4.7:xhigh'). Active default if omitted: '${currentModel}' (${currentThinking}).`
+      })
+    ),
+    block: Type.Optional(
+      Type.Boolean({
+        description: "Whether to wait for completion synchronously. Defaults to false (dispatches asynchronously in background and notifies upon completion)."
+      })
+    ),
+    timeout: Type.Optional(
+      Type.Number({
+        description: "Optional timeout in seconds."
+      })
+    ),
+    status: Type.Optional(
+      Type.Boolean({
+        description: "Optional: query active sidekick runtime status and slots without running a task."
+      })
+    )
+  });
   pi.registerTool({
     name: "sidekick",
     label: "Sidekick",
-    description: "Hand off implementation, testing, bug fixing, or file editing work to a persistent sidekick subagent. Context and session persist across calls to the same slot name.",
+    description: `Hand off implementation, testing, bug fixing, or file editing work to a persistent sidekick subagent. Context and session persist across calls to the same slot name. Active default model: ${currentModel} (${currentThinking}). Sidekick inherits all tools (read, write, replace, bash, cairn, etc.) and project context from Lead. DO NOT inspect sidekick source code or config files \u2014 all settings are controlled via these parameters.`,
     promptSnippet: "Delegate bounded tasks to persistent sidekick slots (e.g. 'coder', 'tester')",
     promptGuidelines: [
       "Keep lead model in charge of planning, user interaction, architecture, and final review.",
       "Delegate code implementation, running tests, fixing linters, or heavy edits to the persistent sidekick via the `sidekick` tool.",
-      "Use slot names (e.g. 'coder', 'tester') to separate work contexts across tasks."
+      "Use slot names (e.g. 'coder', 'tester') to separate work contexts across tasks.",
+      "DO NOT inspect sidekick extension source code, toolkit scripts, or config files \u2014 all capabilities, models, and slots are controlled via the `sidekick` tool parameters.",
+      "Pass model overrides directly in `provider/model[:thinking]` format (e.g. `magpie/fluxtoken/grok-4.7:xhigh`). If omitted, the configured default model is used automatically.",
+      "To run multiple tasks concurrently, call sidekick on different slot names with `block: false`; they run in parallel in the background.",
+      "Call `sidekick({ task: 'status' })` or pass `status: true` to check active slots and default model without running any subagent or reading files."
     ],
     parameters: SidekickParamsSchema,
     async execute(toolCallId, params, signal, onUpdate, ctx) {
+      if (params.status || params.task && params.task.trim().toLowerCase() === "status") {
+        const defaultModel = stateManager.getDefaultModel() || "(auto / inherited)";
+        const defaultThinking = stateManager.getDefaultThinking() || "(default)";
+        const slots = stateManager.getAllSlots();
+        const slotLines = slots.length === 0 ? "  (No active persistent slots currently recorded)" : slots.map(
+          (s) => `  \u2022 [${s.name}] status: ${s.lastStatus} | tasks: ${s.totalTasks} | last active: ${new Date(s.lastActive).toLocaleTimeString()}${s.lastTask ? `
+    last task: ${s.lastTask.slice(0, 80)}` : ""}`
+        ).join("\n");
+        const statusText = `[Sidekick Runtime Status]
+Default Model:    ${defaultModel}
+Default Thinking: ${defaultThinking}
+Active Slots (${slots.length}):
+${slotLines}
+
+Hint: Use \`sidekick({ name: "<slot>", task: "...", model: "..." })\` to dispatch tasks. Slots run concurrently with \`block: false\`.`;
+        return {
+          content: [
+            {
+              type: "text",
+              text: statusText
+            }
+          ],
+          details: {
+            defaultModel,
+            defaultThinking,
+            slots
+          }
+        };
+      }
       const slotName = (params.name || "default").trim().toLowerCase();
       const res = await dispatchSidekick(pi, stateManager, {
         task: params.task,
@@ -563,7 +603,8 @@ function registerSidekickExtension(pi) {
           inheritSkills: true,
           inheritProjectContext: true,
           inheritGlobalContext: true,
-          tools: leadTools
+          tools: leadTools,
+          defaultTimeoutMs: 2147483647
         }
       };
       pi.events.emit("pi-subagents:runtime-agent-register:v1", request);
@@ -601,14 +642,19 @@ ${task}`
     registerOrUpdateSidekickAgent();
     const defaultModel = stateManager.getDefaultModel();
     const modelHint = defaultModel ? `Default sidekick model: ${defaultModel}.` : "";
+    const defaultThinking = stateManager.getDefaultThinking() || "default";
+    const effectiveModel = defaultModel || "(auto / inherited)";
     const policy = `
 # Mode: Lead Architect with Persistent Sidekick
 You are operating in the Lead Architect seat.
 - Your primary role is high-level planning, domain modeling, task coordination, ambiguity resolution, and final acceptance.
-- You have an implementation partner named \`sidekick\` via the \`sidekick\` tool (or native subagent). ${modelHint}
-- Sidekick has the exact same tools, project instructions, and skills as you.
-- For concrete code implementations, running tests, fixing errors, or long refactoring loops, delegate them to a named sidekick slot (e.g. \`coder\`, \`tester\`, or default).
-- The same slot retains its shell state and context across calls.
+- You have an implementation partner named \`sidekick\` via the \`sidekick\` tool (or native subagent).
+- Configured default sidekick model: \`${effectiveModel}\` (thinking: \`${defaultThinking}\`).
+- **DO NOT read, grep, or inspect \`sidekick.js\`, \`pi-toolkit-bundle\`, or \`~/.pi/agent/sidekick/config.json\`.** All configuration, slots, and model options are fully supported directly via the \`sidekick\` tool parameters.
+- Model override format: pass \`model: "provider/model[:thinking]"\` (e.g. \`magpie/fluxtoken/grok-4.7:xhigh\`). If omitted, it defaults to the configured model.
+- Slots: Each slot name (e.g. \`coder\`, \`tester\`, \`grok\`) maintains an isolated persistent shell and session. Call multiple slots with \`block: false\` to run concurrent background workers.
+- Self-inspection: Call \`sidekick({ task: "status" })\` to check currently active slots and models without running bash commands.
+- Sidekick has the exact same tools, project instructions, and skills as you. For concrete code implementations, running tests, fixing errors, or long refactoring loops, delegate them directly to sidekick.
 `;
     if (event.systemPromptOptions?.sections) {
       event.systemPromptOptions.sections.sidekick_policy = policy;
