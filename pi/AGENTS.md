@@ -67,16 +67,21 @@ Keep sessions long-lived and context capacity fresh with the core ACP tools:
 | `search_context` | Search across compressed summaries. | Quickly find prior discussion or decisions without blind decompression. |
 
 ### 6. Tasks, Decisions & Project Memory (Cairn)
-All project tasks, architectural decisions, and verified findings are managed via the **Cairn tool suite** (which natively operates on the project beads store). 
+All project tasks, architectural decisions, and verified findings are managed via the **Cairn tool suite** (which natively operates on the project beads store). **NEVER run `bd` CLI commands directly in bash** — the `cairn_*` tools provide a fully self-contained interface:
 
 | Job | Tool | How to Use |
 |---|---|---|
-| Review state & past decisions | `cairn_recall` | `action: "list"` to see open questions/tasks; `action: "record"` for full history of an issue; `action: "search"` to find prior work. |
-| Formulate candidate approaches | `cairn_option` | Add candidate spikes under a question so trade-offs are explicitly tracked. |
-| Make decision & define work | `cairn_choose` | Select the winning option, specify follow-up tasks, and drop rejected alternatives with rationale in one step. |
+| Query issues & check ready work | `cairn_query` | Query issues by `role` (`question`/`candidate`/`chosen`/`task`/`conclusion`), `status`, `parent`, or `ready: true` (replaces `bd ready`). Pass `id` to inspect full issue details (replaces `bd show`). |
+| Review state & past decisions | `cairn_recall` | High-level synthesis: `action: "list"` to see open questions/tasks; `action: "record"` for full history of an issue; `action: "search"` to find prior work. |
+| Open question / fork | `cairn_question` | Create an epic question (`title`, `what`) or a sub-question under an existing issue (`parent`). Questions compute status automatically. |
+| Formulate candidate approaches | `cairn_option` | Add candidate spikes under a question so trade-offs are explicitly tracked before choosing. |
+| Make decision & rationale | `cairn_choose` | Select the winning option, specify rationale (`why` -> stored as design). Follow-up tasks (`tasks`) and dropping alternatives (`drop`) are optional in this step. |
+| Create implementation tasks | `cairn_task` | Add concrete work items (`parent`, `title`, `description`) under a chosen option whenever ready. |
+| Complete work / land decision | `cairn_close` | Close completed tasks with optional `reason`. When all tasks under a chosen option are done, close the chosen option to mark it landed. |
 | Abandon unviable paths | `cairn_abandon` | Close dropped options with a concise reason so future sessions don't propose them again. |
+| Overturn an earlier decision | `cairn_supersede` | Mark an earlier chosen option superseded by a new option (`old_id`, `new_id`, `reason`). |
 | Settle verified facts | `cairn_conclude` | Record empirically verified findings or benchmark conclusions with evidence. |
-| Request operator decision | `cairn_ask` | Label issues needing operator intervention and wait on human feedback. |
+| Request operator decision | `cairn_ask` | Label issues needing operator intervention (`human`) and wait on human feedback. |
 
 ### 7. Delegation & Human Alignment
 - **`sidekick`**: Delegate heavy execution, boilerplate implementation, linter fixes, or test running to persistent slots (e.g. `sidekick({ name: "coder", task: "..." })`). Lead keeps architecture and review.

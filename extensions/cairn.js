@@ -581,23 +581,23 @@ function renderReviewWith(beads, index, conventions) {
 function piConventionsText(codemode = false) {
   const lines = [
     "Cairn: this project's beads store also records decisions, not just work. Record as you go, with the cairn tools.",
+    "All questions, options, tasks, conclusions, queries, and closures are managed with cairn_* tools. Do NOT run bd CLI commands in bash.",
+    "- query issues and check ready work: cairn_query({ role?, status?, parent?, ready?, id? }). Use ready: true to find tasks ready to work on, or id to inspect an issue in detail (replaces bd ready and bd show).",
     '- read the recorded state, or read a record: cairn_recall, action "list" (the questions), "record" with a question id, or "search" with text. Do it before proposing an approach; do not re-propose an abandoned option unless what ruled it out has changed.',
-    '- A question is an epic: `bd create "<question>" -t epic --description="<what is decided, and the constraints>"`. A sub-question is an epic under the item it grows from: the question it splits, the option it evaluates, the chosen option it follows from, or the task it came out of.',
+    "- A question is an epic to decide or explore: cairn_question. A sub-question has parent set to the item it grows from (the question it splits, the option it evaluates, the chosen option it follows from, or the task it came out of). Do not manually close questions; their state is computed automatically (open -> decided -> landed).",
     "- A candidate is an option, an open spike under its question: cairn_option. Its description says what it is, never why it lost.",
-    "- choose an option: cairn_choose. It labels the option chosen and stores the why as its design. Give option (an existing option), or question, title and what for a new option chosen at once. Pass tasks for the work that follows, created under it, and drop for the candidates you rejected.",
-    "- Work under a chosen option is a task under that option. Do not open a separate epic for open work.",
-    "- A chosen option stays open while its work runs. Close it when that work is done, or at once when no work follows: `bd close <id>`. A closed chosen option counts as landed.",
-    "- A question can have more than one chosen option, each for a part of it. Supersede only when the new option replaces the old one.",
+    "- choose an option: cairn_choose. It labels the option chosen and stores the why as its design. Give option (an existing option), or question, title and what for a new option chosen at once. Tasks are optional \u2014 choosing does not require immediate breakdown. Pass drop for the candidates you rejected.",
+    "- Work under a chosen option is a task under that option: cairn_task. Create tasks under the chosen option whenever you are ready to break down work. Do not open a separate epic for open work.",
+    "- Complete work or land a decision: cairn_close. Close tasks when finished and verified. When all tasks under a chosen option are done, close the chosen option to mark it landed.",
     "- drop an option: cairn_abandon with a one-line reason; a longer argument goes in detail. Its open sub-questions and tasks go with it.",
-    "- Overturn a chosen option with `bd supersede <old-id> --with <new-id>`, not by editing it. Then move its open children under a live option or question, or abandon them.",
+    "- Overturn a chosen option: cairn_supersede with old_id and new_id. Then move its open children under a live option or question, or abandon them.",
     "- record a finding (looked up, tested, read in the code, or stated by the person): cairn_conclude, under the question, option or task it verifies. Only what is established: a guess stays a candidate or a question.",
     "- flag a question for the person (it can wait): cairn_ask, then say so in your reply; do not answer it yourself.",
-    "- ask the person interactively (you need the answer now): ask_user_question; if it is missing, ask in plain text with numbered options.",
-    'If a cairn tool is missing, use plain bd: option = `bd create "<option>" -t spike --parent=<question> --description="<what>"`; choose = `bd label add <id> chosen` and `bd update <id> --design="<why>"` (a new option chosen at once: `bd create "<option>" -t spike --parent=<question> -l chosen --description="<what>"`, then the design), then `bd create "<task>" -t task --parent=<id>` for each task; drop = `bd close <id> --reason="<why>"` and `bd label add <id> abandoned`; finding = `bd create "<finding>" -t task -l conclusion --parent=<id> --description="<evidence>"` and `bd close <id>`; flag = `bd label add <id> human` and `bd comment <id> "<question>"`.'
+    "- ask the person interactively (you need the answer now): ask_user_question; if it is missing, ask in plain text with numbered options."
   ];
   if (codemode) {
     lines.push(
-      "Codemode is active: call cairn_option, cairn_choose, cairn_abandon, cairn_conclude and cairn_ask from a codemode script, as `await tools.cairn_choose({ option, why, tasks, drop })`. cairn_recall stays direct."
+      "Codemode is active: call cairn write tools from a codemode script, as `await tools.cairn_choose({ option, why })`. cairn_recall and cairn_query stay direct."
     );
   }
   return lines.join("\n");
@@ -639,6 +639,12 @@ async function createIssue(run, args, mark) {
   const id = result.stdout.trim().split(/\r?\n/).pop()?.trim() ?? "";
   if (!/^\S+$/.test(id)) throw new Error(`bd created an issue but printed no id (got ${JSON.stringify(result.stdout.trim())}).`);
   return id;
+}
+async function question(run, input, mark) {
+  const args = ["--title=" + input.title, "-t", "epic"];
+  if (input.parent) args.push("--parent=" + input.parent);
+  if (input.description) args.push("--description=" + input.description);
+  return createIssue(run, args, mark);
 }
 async function option(run, input, mark) {
   return createIssue(
@@ -684,6 +690,30 @@ async function choose(run, input, mark) {
     await abandon(run, { id: drop.id, reason: drop.reason }, mark);
   }
   return ids;
+}
+async function task(run, input, mark) {
+  const args = ["--title=" + input.title, "-t", "task", "--parent=" + input.parent];
+  if (input.description) args.push("--description=" + input.description);
+  return createIssue(run, args, mark);
+}
+async function closeIssue(run, input, mark) {
+  const args = ["close", input.id];
+  if (input.reason) args.push("--reason=" + input.reason);
+  const result = await run(args);
+  if (!result.ok) throw new Error(`bd close ${input.id} failed: ${result.error}. Nothing changed.`);
+  mark();
+}
+async function supersede(run, input, mark) {
+  const result = await run(["supersede", input.oldId, "--with", input.newId]);
+  if (!result.ok) throw new Error(`bd supersede ${input.oldId} --with ${input.newId} failed: ${result.error}. Nothing changed.`);
+  mark();
+  if (input.reason) {
+    const commented = await run(["comment", input.oldId, "--", `Superseded by ${input.newId}: ${input.reason}`]);
+    if (!commented.ok) {
+      throw new Error(`superseded ${input.oldId} with ${input.newId}, but bd comment failed: ${commented.error}.`);
+    }
+    mark();
+  }
 }
 async function abandon(run, input, mark) {
   const { id } = input;
@@ -762,8 +792,8 @@ function panelLines(snapshot) {
     lines.push(`Needs you (${waiting.length}):`);
     for (const bead of waiting.slice(0, NEEDS_SHOWN)) {
       lines.push(`  ${bead.id} ${clean2(bead.title)}`);
-      const question = bead.comments?.at(-1)?.text;
-      if (question) lines.push(`    ? ${clean2(firstLine(question))}`);
+      const question2 = bead.comments?.at(-1)?.text;
+      if (question2) lines.push(`    ? ${clean2(firstLine(question2))}`);
     }
     if (waiting.length > NEEDS_SHOWN) lines.push(`  (+${waiting.length - NEEDS_SHOWN} more; /cairn-answer lists them all)`);
   }
@@ -787,12 +817,22 @@ function callSummary(tool, args) {
   switch (tool) {
     case "cairn_recall":
       return [str("action"), str("id") || str("text")].filter(Boolean).join(" ");
+    case "cairn_query":
+      return str("id") || [str("role"), str("status")].filter(Boolean).join(" ") || (args.ready ? "ready" : "");
+    case "cairn_question":
+      return str("title");
     case "cairn_option":
       return [str("question"), str("title")].filter(Boolean).join(": ");
     case "cairn_choose":
       return [str("option") || str("title"), str("why")].filter(Boolean).join(": ");
+    case "cairn_task":
+      return [str("parent"), str("title")].filter(Boolean).join(": ");
+    case "cairn_close":
+      return [str("id"), str("reason")].filter(Boolean).join(": ");
     case "cairn_abandon":
       return str("id");
+    case "cairn_supersede":
+      return [str("old_id"), str("new_id")].filter(Boolean).join(" \u2192 ");
     case "cairn_conclude":
       return str("finding");
     case "cairn_ask":
@@ -1062,16 +1102,16 @@ ${design || "_No rationale recorded._"}`);
 }
 function checklist(tree, tasks, depth, seen) {
   const lines = [];
-  for (const task of tasks) {
-    if (seen.has(task.id)) continue;
-    seen.add(task.id);
-    const done = tree.isDone(task);
-    const stranded = tree.strandedUnder(task);
+  for (const task2 of tasks) {
+    if (seen.has(task2.id)) continue;
+    seen.add(task2.id);
+    const done = tree.isDone(task2);
+    const stranded = tree.strandedUnder(task2);
     const warning = stranded ? ` \u2014 stranded under \`${stranded.id}\`: re-parent or abandon` : "";
-    lines.push(`${"  ".repeat(depth)}- [${done ? "x" : " "}] ${oneLine(task.title)} (\`${task.id}\`)${warning}`);
-    const nested = sorted(tree.childrenWith(task.id, "task"));
+    lines.push(`${"  ".repeat(depth)}- [${done ? "x" : " "}] ${oneLine(task2.title)} (\`${task2.id}\`)${warning}`);
+    const nested = sorted(tree.childrenWith(task2.id, "task"));
     if (nested.length > 0) lines.push(checklist(tree, nested, depth + 1, seen));
-    for (const finding of sorted(tree.childrenWith(task.id, "conclusion"))) {
+    for (const finding of sorted(tree.childrenWith(task2.id, "conclusion"))) {
       if (seen.has(finding.id)) continue;
       seen.add(finding.id);
       lines.push(`${"  ".repeat(depth + 1)}- ${conclusionLine(finding)}`);
@@ -1158,12 +1198,12 @@ function resolveId(given, beads) {
 }
 function renderQuestions(beads, index, hint = "Print one with: record.js <question-id>") {
   const tree = new RecordTree(beads, index);
-  const questions = beads.filter((b) => tree.role(b) === "question").map((question) => {
-    const below = tree.descendants(question.id);
+  const questions = beads.filter((b) => tree.role(b) === "question").map((question2) => {
+    const below = tree.descendants(question2.id);
     const closed = below.filter((b) => index.isDone(b.status));
     return {
-      question,
-      state: tree.questionState(question.id).state,
+      question: question2,
+      state: tree.questionState(question2.id).state,
       open: below.length - closed.length,
       closed: closed.length,
       abandoned: closed.filter((b) => tree.role(b) === "abandoned").length,
@@ -1176,11 +1216,11 @@ function renderQuestions(beads, index, hint = "Print one with: record.js <questi
     return 'No questions yet. A question is recorded as an epic: bd create "<question>" -t epic.\n';
   }
   const idWidth = Math.max(...questions.map((q) => q.question.id.length));
-  const lines = questions.map(({ question, state, open, closed, abandoned, concluded }) => {
-    const done = index.isDone(question.status) ? " [closed]" : "";
+  const lines = questions.map(({ question: question2, state, open, closed, abandoned, concluded }) => {
+    const done = index.isDone(question2.status) ? " [closed]" : "";
     const notes = [abandoned ? `${abandoned} abandoned` : "", concluded ? `${concluded} concluded` : ""].filter(Boolean);
     const counts = `${open} open, ${closed} closed${notes.length > 0 ? ` (${notes.join(", ")})` : ""}`;
-    return `${question.id.padEnd(idWidth)}  ${question.title.replace(/\s+/g, " ")}  [${state}]${done}  \u2014 ${counts}`;
+    return `${question2.id.padEnd(idWidth)}  ${question2.title.replace(/\s+/g, " ")}  [${state}]${done}  \u2014 ${counts}`;
   });
   return `Questions (${questions.length}):
 ${lines.join("\n")}
@@ -1282,6 +1322,144 @@ function cairnTools(Type2, host) {
       });
     }
   };
+  const queryTool = {
+    name: "cairn_query",
+    label: "Cairn query",
+    description: "Query issues by role, status, parent, ready-state, or fetch a specific issue by id. Replaces bd ready and bd show. Use to find pending tasks, inspect active chosen options, or check what is ready to work on.",
+    promptSnippet: "cairn_query: query issues by role, status, ready-state, or id",
+    promptGuidelines: ["Use cairn_query({ ready: true }) to find tasks ready to work on."],
+    parameters: Type2.Object({
+      id: Type2.Optional(Type2.String({ description: "Specific issue id to inspect in detail (replaces bd show)." })),
+      role: Type2.Optional(
+        Type2.Union(
+          [
+            Type2.Literal("question", { description: "Decisions/epics." }),
+            Type2.Literal("candidate", { description: "Proposed candidate options." }),
+            Type2.Literal("chosen", { description: "Active or landed chosen options." }),
+            Type2.Literal("task", { description: "Concrete implementation tasks." }),
+            Type2.Literal("conclusion", { description: "Recorded findings." })
+          ],
+          { description: "Filter by semantic role in the Cairn tree." }
+        )
+      ),
+      status: Type2.Optional(
+        Type2.Union(
+          [
+            Type2.Literal("open", { description: "Only open issues (default)." }),
+            Type2.Literal("closed", { description: "Only closed issues." }),
+            Type2.Literal("all", { description: "All issues regardless of status." })
+          ],
+          { description: 'Filter by status (default: "open").' }
+        )
+      ),
+      parent: Type2.Optional(Type2.String({ description: "Filter issues belonging to this parent id." })),
+      ready: Type2.Optional(
+        Type2.Boolean({ description: "If true, only return open actionable tasks with no unresolved dependencies (like bd ready)." })
+      ),
+      human: Type2.Optional(Type2.Boolean({ description: "If true, only return issues flagged with the human label." })),
+      limit: Type2.Optional(Type2.Number({ description: "Max issues to return (default: 20)." }))
+    }),
+    annotations: { readOnlyHint: true },
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      return inStore(host, ctx, async (_project, run) => {
+        const beads = await loadBeadsAsync(run);
+        if (typeof beads === "string") throw new Error(beads);
+        const index = await loadIndexAsync(run);
+        const tree = new RecordTree(beads, index);
+        if (params.id) {
+          const targetId = resolveId(params.id, beads);
+          if (typeof targetId !== "string") throw new Error(`Issue not found: ${params.id}`);
+          const bead = beads.find((b) => b.id === targetId);
+          if (!bead) throw new Error(`Issue not found: ${targetId}`);
+          const role = tree.role(bead);
+          const parent = parentIdOf(bead);
+          const lines2 = [
+            `[${bead.id}] ${bead.title}`,
+            `Role: ${role} | Type: ${bead.issue_type} | Status: ${bead.status}`
+          ];
+          if (parent) lines2.push(`Parent: ${parent}`);
+          if (bead.labels?.length) lines2.push(`Labels: ${bead.labels.join(", ")}`);
+          if (bead.description) lines2.push(`Description:
+${bead.description}`);
+          if (bead.design) lines2.push(`Design / Why:
+${bead.design}`);
+          if (bead.close_reason) lines2.push(`Close Reason: ${bead.close_reason}`);
+          const children = tree.childrenOf(bead.id);
+          if (children.length > 0) {
+            lines2.push(`Children (${children.length}):`);
+            for (const child of children) {
+              lines2.push(`  \u2022 ${child.id} [${tree.role(child)}] [${child.status}] ${child.title}`);
+            }
+          }
+          return reply(truncate2(lines2.join("\n")), [bead.id], `${bead.id}: ${firstLine(bead.title)}`);
+        }
+        const filterStatus = params.status ?? "open";
+        const limit = params.limit ?? 20;
+        let filtered = beads.filter((b) => {
+          if (filterStatus === "open" && index.isDone(b.status)) return false;
+          if (filterStatus === "closed" && !index.isDone(b.status)) return false;
+          if (params.role && tree.role(b) !== params.role) return false;
+          if (params.parent && parentIdOf(b) !== params.parent) return false;
+          if (params.human && !isNeedsYou(b, index)) return false;
+          return true;
+        });
+        if (params.ready) {
+          filtered = filtered.filter((b) => {
+            const role = tree.role(b);
+            if (role !== "task") return false;
+            if (index.isDone(b.status)) return false;
+            const deps = b.dependencies ?? [];
+            for (const dep of deps) {
+              if (dep.type === "blocked-by" || dep.type === "depends-on") {
+                const blocker = beads.find((other) => other.id === dep.id);
+                if (blocker && !index.isDone(blocker.status)) return false;
+              }
+            }
+            return true;
+          });
+        }
+        const total = filtered.length;
+        const page = filtered.slice(0, limit);
+        const header = `Found ${total} ${params.role ?? "item"}${total === 1 ? "" : "s"}` + (params.ready ? " (ready to execute)" : "") + (total > limit ? ` (showing first ${limit})` : "") + ":";
+        const lines = [header];
+        for (const item of page) {
+          const role = tree.role(item);
+          const parent = parentIdOf(item);
+          const parentStr = parent ? ` (parent: ${parent})` : "";
+          lines.push(`\u2022 ${item.id} [${role}] [${item.status}] ${item.title}${parentStr}`);
+          if (role === "chosen" && item.design) {
+            lines.push(`    why: ${firstLine(item.design)}`);
+          }
+        }
+        return reply(truncate2(lines.join("\n")), page.map((i) => i.id), `query: ${total} results`);
+      });
+    }
+  };
+  const questionTool = {
+    name: "cairn_question",
+    label: "Cairn question",
+    description: "Create a decision question (an epic) or a sub-question under an existing issue. Questions represent architectural or design forks needing resolution. Do not close manually; its state is computed.",
+    promptSnippet: "cairn_question: create an epic/question or sub-question to settle",
+    parameters: Type2.Object({
+      title: Type2.String({ description: "The question to answer, in one sentence." }),
+      what: Type2.Optional(Type2.String({ description: "Context, background, and constraints." })),
+      description: Type2.Optional(Type2.String({ description: "Context, background, and constraints (alias for what)." })),
+      parent: Type2.Optional(Type2.String({ description: "Parent issue id if this is a sub-question." }))
+    }),
+    annotations: WRITE_ANNOTATIONS,
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      return inStore(host, ctx, async (_project, run, mark) => {
+        const input = {
+          title: oneLine2(params.title, "title"),
+          description: optionalText(params.what ?? params.description),
+          parent: optionalId(params.parent, "parent")
+        };
+        const id = await question(run, input, mark);
+        const under = input.parent ? ` under ${input.parent}` : "";
+        return reply(`Created question ${id}${under}: ${input.title}`, [id], `\u2713 question ${id}: ${input.title}`);
+      });
+    }
+  };
   const optionTool = {
     name: "cairn_option",
     label: "Cairn option",
@@ -1309,9 +1487,9 @@ function cairnTools(Type2, host) {
   const chooseTool = {
     name: "cairn_choose",
     label: "Cairn choose",
-    description: "Choose an option in the project beads store. Give option (the id of an existing option) or question, title and what (a new option, created already chosen; what is its description). The option is marked chosen and stays open while its work runs. Close it with bd close when that work is done. why is stored as its design. Pass tasks for the work that follows, created under it, and drop to abandon the other candidates in the same step. Use it when you choose between live options.",
-    promptSnippet: "cairn_choose: mark an option chosen, with its rationale, its tasks and the options dropped",
-    promptGuidelines: ["Record a choice with cairn_choose as soon as it is made, with the rationale and the tasks that follow."],
+    description: "Choose an option in the project beads store. Give option (the id of an existing option) or question, title and what (a new option, created already chosen; what is its description). The option is marked chosen and stays open while its work runs. Close it with cairn_close when that work is done. why is stored as its design (rationale). tasks is optional \u2014 choosing does not require immediate breakdown; tasks can be added later anytime with cairn_task. Pass drop to abandon other candidates in the same step.",
+    promptSnippet: "cairn_choose: mark an option chosen, with its rationale (tasks and drop optional)",
+    promptGuidelines: ["Record a choice with cairn_choose as soon as it is made, with the rationale. Tasks can be attached or added later with cairn_task."],
     parameters: Type2.Object({
       option: Type2.Optional(Type2.String({ description: "Id of an existing option (a spike) to mark chosen." })),
       question: Type2.Optional(Type2.String({ description: "Id of the question, with title, for a new option chosen at once." })),
@@ -1349,6 +1527,56 @@ function cairnTools(Type2, host) {
       });
     }
   };
+  const taskTool = {
+    name: "cairn_task",
+    label: "Cairn task",
+    description: "Create a concrete implementation task under a chosen option (or under another task). Tasks represent executable work items. Add tasks whenever ready \u2014 choosing an option does not require immediate breakdown. Complete tasks with cairn_close when done.",
+    promptSnippet: "cairn_task: create an implementation task under a chosen option or parent task",
+    parameters: Type2.Object({
+      parent: Type2.Optional(
+        Type2.String({ description: "Id of the chosen option or parent task this task belongs to." })
+      ),
+      option: Type2.Optional(
+        Type2.String({ description: "Alias for parent: id of the chosen option this task belongs to." })
+      ),
+      title: Type2.String({ description: "The task in one line." }),
+      description: Type2.Optional(Type2.String({ description: "Details, requirements, and acceptance criteria." }))
+    }),
+    annotations: WRITE_ANNOTATIONS,
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      return inStore(host, ctx, async (_project, run, mark) => {
+        const parentId = params.parent ?? params.option;
+        if (!parentId) throw new Error("parent is required.");
+        const input = {
+          parent: issueId(parentId, "parent"),
+          title: oneLine2(params.title, "title"),
+          description: optionalText(params.description)
+        };
+        const id = await task(run, input, mark);
+        return reply(`Created task ${id} under ${input.parent}: ${input.title}`, [id], `\u2713 task ${id}: ${input.title}`);
+      });
+    }
+  };
+  const closeTool = {
+    name: "cairn_close",
+    label: "Cairn close",
+    description: "Complete a task or mark a chosen option as landed. When a task is finished and verified, close it with cairn_close. When all tasks and sub-questions under a chosen option are done, close the chosen option to mark the decision landed.",
+    promptSnippet: "cairn_close: complete a task or mark a chosen option as landed",
+    parameters: Type2.Object({
+      id: Type2.String({ description: "Id of the task or chosen option to close." }),
+      reason: Type2.Optional(Type2.String({ description: "Optional one-line completion note or summary." }))
+    }),
+    annotations: WRITE_ANNOTATIONS,
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      return inStore(host, ctx, async (_project, run, mark) => {
+        const id = issueId(params.id, "id");
+        const reason = params.reason ? oneLine2(params.reason, "reason") : void 0;
+        await closeIssue(run, { id, reason }, mark);
+        const note = reason ? ` (${reason})` : "";
+        return reply(`Closed ${id}${note}`, [id], `\u2713 closed ${id}${note}`);
+      });
+    }
+  };
   const abandonTool = {
     name: "cairn_abandon",
     label: "Cairn abandon",
@@ -1367,6 +1595,28 @@ function cairnTools(Type2, host) {
         const detail = optionalText(params.detail);
         await abandon(run, { id, reason, detail }, mark);
         return reply(`Abandoned ${id}: ${reason}`, [id], `\u2713 abandoned ${id}: ${reason}`);
+      });
+    }
+  };
+  const supersedeTool = {
+    name: "cairn_supersede",
+    label: "Cairn supersede",
+    description: "Overturn a previously chosen option with a newly chosen option. Marks old_id superseded and adds a pointer to new_id. Use when past decisions need to be revised or replaced with a superior approach.",
+    promptSnippet: "cairn_supersede: overturn an earlier chosen option with a new chosen option",
+    parameters: Type2.Object({
+      old_id: Type2.String({ description: "Id of the earlier chosen option being superseded." }),
+      new_id: Type2.String({ description: "Id of the new chosen option taking its place." }),
+      reason: Type2.Optional(Type2.String({ description: "Why the old decision is being replaced." }))
+    }),
+    annotations: WRITE_ANNOTATIONS,
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      return inStore(host, ctx, async (_project, run, mark) => {
+        const oldId = issueId(params.old_id, "old_id");
+        const newId = issueId(params.new_id, "new_id");
+        const reason = optionalText(params.reason);
+        await supersede(run, { oldId, newId, reason }, mark);
+        const reasonStr = reason ? `: ${reason}` : "";
+        return reply(`Superseded ${oldId} with ${newId}${reasonStr}`, [oldId, newId], `\u2713 superseded ${oldId} \u2192 ${newId}`);
       });
     }
   };
@@ -1413,32 +1663,44 @@ function cairnTools(Type2, host) {
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       return inStore(host, ctx, async (_project, run, mark) => {
         const id = issueId(params.id, "id");
-        const question = requireText(params.question, "question");
-        await ask(run, { id, question }, mark);
+        const question2 = requireText(params.question, "question");
+        await ask(run, { id, question: question2 }, mark);
         return reply(
           `Asked the person about ${id}; it is labelled human and stays open.`,
           [id],
-          `? asked on ${id}: ${firstLine(question)}`
+          `? asked on ${id}: ${firstLine(question2)}`
         );
       });
     }
   };
-  return [recall, optionTool, chooseTool, abandonTool, concludeTool, askTool];
+  return [
+    recall,
+    queryTool,
+    questionTool,
+    optionTool,
+    chooseTool,
+    taskTool,
+    closeTool,
+    abandonTool,
+    supersedeTool,
+    concludeTool,
+    askTool
+  ];
 }
 function chooseInput(params) {
   const optionId = optionalId(params.option, "option");
-  const question = optionalId(params.question, "question");
+  const question2 = optionalId(params.question, "question");
   const title = optionalText(params.title);
   const what = optionalText(params.what);
-  if (optionId && (question || title || what)) throw new Error("Give option, or question with title and what, not both.");
-  if (!optionId && !(question && title && what)) throw new Error("Give option, or question with title and what, to choose.");
+  if (optionId && (question2 || title || what)) throw new Error("Give option, or question with title and what, not both.");
+  if (!optionId && !(question2 && title && what)) throw new Error("Give option, or question with title and what, to choose.");
   return {
     option: optionId,
-    question,
+    question: question2,
     title: title && oneLine2(title, "title"),
     what,
     why: requireText(params.why, "why"),
-    tasks: (params.tasks ?? []).map((task) => oneLine2(task, "tasks")),
+    tasks: (params.tasks ?? []).map((task2) => oneLine2(task2, "tasks")),
     drop: (params.drop ?? []).map((d) => ({ id: issueId(d.id, "drop.id"), reason: oneLine2(d.reason, "drop.reason") }))
   };
 }
@@ -1496,7 +1758,17 @@ function optionalText(value) {
 }
 
 // pi-extension/src/extension.ts
-var WRITE_TOOLS = ["cairn_option", "cairn_choose", "cairn_abandon", "cairn_conclude", "cairn_ask"];
+var WRITE_TOOLS = [
+  "cairn_question",
+  "cairn_option",
+  "cairn_choose",
+  "cairn_task",
+  "cairn_close",
+  "cairn_abandon",
+  "cairn_supersede",
+  "cairn_conclude",
+  "cairn_ask"
+];
 var CODEMODE_TOOL = "codemode";
 var PANEL_SHORTCUT = "ctrl+shift+c";
 var STATUS_KEY = "cairn";
