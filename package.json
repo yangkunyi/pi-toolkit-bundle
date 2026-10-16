@@ -1,0 +1,32 @@
+{
+  "name": "pi-toolkit-bundle",
+  "version": "1.0.0",
+  "description": "Integrated Cairn Decision System, Persistent Sidekick, and Curated Skills for Pi Coding Agent",
+  "main": "extensions/index.js",
+  "type": "module",
+  "bin": {
+    "cairn": "./bin/cairn"
+  },
+  "keywords": [
+    "pi-package",
+    "cairn",
+    "sidekick",
+    "beads",
+    "skills"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/index.js"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  }
+}

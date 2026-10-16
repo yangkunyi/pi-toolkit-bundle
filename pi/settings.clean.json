@@ -5,6 +5,7 @@
   "defaultThinkingLevel": "high",
   "enableSkillCommands": true,
   "packages": [
+    "git:github.com/yangkunyi/pi-toolkit-bundle",
     "npm:pi-subagents",
     "npm:@plannotator/pi-extension",
     "npm:pi-web-access",

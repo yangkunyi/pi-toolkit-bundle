@@ -1505,8 +1505,11 @@ var COMPACT_NOTE = [
   'Call cairn_recall first (action "list", or "search" with the topic) to see what is recorded, then record only what is missing with the cairn tools. If nothing is missing, say so in one line.'
 ].join("\n");
 function skillDirFrom(moduleUrl) {
-  const dir = resolve(dirname3(fileURLToPath(moduleUrl)), "..", "..", "claude-plugin", "skills");
-  return existsSync(dir) ? dir : void 0;
+  const base = dirname3(fileURLToPath(moduleUrl));
+  const dir1 = resolve(base, "..", "skills");
+  if (existsSync(dir1)) return dir1;
+  const dir2 = resolve(base, "..", "..", "claude-plugin", "skills");
+  return existsSync(dir2) ? dir2 : void 0;
 }
 function newRun() {
   return { startedAt: Date.now(), wrote: false, continued: false };

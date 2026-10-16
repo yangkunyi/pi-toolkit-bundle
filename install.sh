@@ -37,7 +37,21 @@ else
   echo "⚠ bd still not detected on PATH. Make sure ~/.local/bin or npm bin is in your PATH."
 fi
 
-# 3. Check / Install Pi
+# 3. Check / Install RTK CLI
+if ! command -v rtk >/dev/null 2>&1; then
+  echo "⚠ 'rtk' (RTK CLI) not found. Installing via official script..."
+  curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh || {
+    echo "⚠ Failed to install rtk automatically. You can install it manually from https://github.com/rtk-ai/rtk"
+  }
+fi
+
+if command -v rtk >/dev/null 2>&1; then
+  echo "✓ rtk detected: $(rtk --version 2>/dev/null || echo 'installed')"
+else
+  echo "⚠ rtk still not detected on PATH. Make sure ~/.local/bin is in your PATH."
+fi
+
+# 4. Check / Install Pi
 if ! command -v pi >/dev/null 2>&1; then
   echo "⚠ 'pi' command not found. Installing @earendil-works/pi-coding-agent globally..."
   npm install -g @earendil-works/pi-coding-agent || {
@@ -52,23 +66,16 @@ else
   echo "⚠ Continuing without pi on PATH. You can install it later."
 fi
 
-# 4. Install Cairn Extension into Pi
+# 5. Install Unified Pi Toolkit Bundle into Pi (Cairn + Sidekick + Skills)
 echo ""
-echo "--> Installing Cairn extension into Pi..."
+echo "--> Installing unified Pi Toolkit package into Pi..."
 if command -v pi >/dev/null 2>&1; then
-  pi install "$SCRIPT_DIR/cairn/pi-extension" || echo "⚠ pi install cairn failed; check pi status"
+  pi install "$SCRIPT_DIR" || echo "⚠ pi install toolkit bundle failed; check pi status"
 else
   echo "  Skipped 'pi install' because pi is not yet installed."
 fi
 
-# 5. Install Sidekick Extension into Pi
-echo ""
-echo "--> Installing Pi Sidekick extension into Pi..."
-if command -v pi >/dev/null 2>&1; then
-  pi install "$SCRIPT_DIR/sidekick" || echo "⚠ pi install sidekick failed"
-fi
-
-# 5b. Install Ecosystem Extensions into Pi
+# 6. Install Recommended Ecosystem Extensions into Pi
 echo ""
 echo "--> Installing Ecosystem Pi extensions..."
 if command -v pi >/dev/null 2>&1; then
@@ -94,17 +101,17 @@ if command -v pi >/dev/null 2>&1; then
   done
 fi
 
-# 6. Link Cairn CLI binary to ~/.local/bin
+# 7. Link Cairn CLI binary to ~/.local/bin
 echo ""
 echo "--> Linking cairn CLI tool to $BIN_DIR..."
-ln -sf "$SCRIPT_DIR/cairn/bin/cairn" "$BIN_DIR/cairn"
-chmod +x "$SCRIPT_DIR/cairn/bin/cairn"
+ln -sf "$SCRIPT_DIR/bin/cairn" "$BIN_DIR/cairn"
+chmod +x "$SCRIPT_DIR/bin/cairn"
 echo "✓ Linked 'cairn' to $BIN_DIR"
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
   echo "  Note: Ensure $BIN_DIR is in your PATH (e.g. export PATH=\"\$HOME/.local/bin:\$PATH\")"
 fi
 
-# 7. Install Skills
+# 8. Install Skills to Agent Skills Directory
 echo ""
 echo "--> Installing Skills into $AGENTS_SKILLS_DIR and $PI_AGENT_DIR/skills..."
 mkdir -p "$PI_AGENT_DIR/skills"
@@ -117,7 +124,7 @@ for skill_dir in "$SCRIPT_DIR/skills"/*; do
   fi
 done
 
-# 8. Setup Pi Config (AGENTS.md, APPEND_SYSTEM.md, clean settings)
+# 9. Setup Pi Config (AGENTS.md, APPEND_SYSTEM.md, clean settings, open-tui, optimizer, sol-pi)
 echo ""
 echo "--> Setting up Pi Configuration in $PI_AGENT_DIR..."
 if [ ! -f "$PI_AGENT_DIR/settings.json" ]; then
@@ -144,7 +151,7 @@ for cfg in open-tui.json optimizer.json sol-pi.json; do
   fi
 done
 
-# 9. Install VS Code / Cursor Extension
+# 10. Install VS Code / Cursor Extension
 echo ""
 echo "--> Installing Cairn VS Code extension..."
 VSIX_FILE="$SCRIPT_DIR/vscode/cairn-0.2.1.vsix"
@@ -175,7 +182,7 @@ if [ "$INSTALLED_IDE" -eq 0 ]; then
   echo "    Path: $VSIX_FILE"
 fi
 
-# 10. Verification
+# 11. Verification
 echo ""
 echo "========================================================"
 echo "    Setup Complete!"
@@ -188,7 +195,7 @@ echo ""
 echo "2. Open the project in Pi coding agent:"
 echo "     pi"
 echo "   Cairn tools (cairn_recall, cairn_choose, cairn_option, etc.)"
-echo "   will be loaded automatically without needing to read source code."
+echo "   and Sidekick persistent subagent will load automatically."
 echo ""
 echo "3. Open the project in VS Code / Cursor:"
 echo "   Click on the Cairn icon in the activity bar to view"
