@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_URL="https://github.com/yangkunyi/pi-toolkit-bundle.git"
+INSTALL_DIR="${HOME}/.local/share/pi-toolkit-bundle"
 BIN_DIR="${HOME}/.local/bin"
 PI_AGENT_DIR="${PI_CODING_AGENT_DIR:-${HOME}/.pi/agent}"
 AGENTS_SKILLS_DIR="${HOME}/.agents/skills"
@@ -9,6 +10,22 @@ AGENTS_SKILLS_DIR="${HOME}/.agents/skills"
 echo "========================================================"
 echo "    Pi + Cairn + Sidekick All-in-One Installer"
 echo "========================================================"
+
+# Detect whether running from an existing local clone or via curl | bash
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]:-}" ] && [ -f "$(dirname "${BASH_SOURCE[0]}")/package.json" ]; then
+  BUNDLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+  echo "--> Running in zero-clone mode..."
+  if [ -d "$INSTALL_DIR/.git" ]; then
+    echo "  Updating existing toolkit in $INSTALL_DIR..."
+    git -C "$INSTALL_DIR" pull --quiet || true
+  else
+    echo "  Downloading pi-toolkit-bundle into $INSTALL_DIR..."
+    mkdir -p "$(dirname "$INSTALL_DIR")"
+    git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
+  fi
+  BUNDLE_DIR="$INSTALL_DIR"
+fi
 
 mkdir -p "$BIN_DIR"
 mkdir -p "$PI_AGENT_DIR"
@@ -70,7 +87,7 @@ fi
 echo ""
 echo "--> Installing unified Pi Toolkit package into Pi..."
 if command -v pi >/dev/null 2>&1; then
-  pi install "$SCRIPT_DIR" || echo "⚠ pi install toolkit bundle failed; check pi status"
+  pi install "$BUNDLE_DIR" || echo "⚠ pi install toolkit bundle failed; check pi status"
 else
   echo "  Skipped 'pi install' because pi is not yet installed."
 fi
@@ -104,8 +121,8 @@ fi
 # 7. Link Cairn CLI binary to ~/.local/bin
 echo ""
 echo "--> Linking cairn CLI tool to $BIN_DIR..."
-ln -sf "$SCRIPT_DIR/bin/cairn" "$BIN_DIR/cairn"
-chmod +x "$SCRIPT_DIR/bin/cairn"
+ln -sf "$BUNDLE_DIR/bin/cairn" "$BIN_DIR/cairn"
+chmod +x "$BUNDLE_DIR/bin/cairn"
 echo "✓ Linked 'cairn' to $BIN_DIR"
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
   echo "  Note: Ensure $BIN_DIR is in your PATH (e.g. export PATH=\"\$HOME/.local/bin:\$PATH\")"
@@ -115,7 +132,7 @@ fi
 echo ""
 echo "--> Installing Skills into $AGENTS_SKILLS_DIR and $PI_AGENT_DIR/skills..."
 mkdir -p "$PI_AGENT_DIR/skills"
-for skill_dir in "$SCRIPT_DIR/skills"/*; do
+for skill_dir in "$BUNDLE_DIR/skills"/*; do
   if [ -d "$skill_dir" ]; then
     skill_name="$(basename "$skill_dir")"
     cp -rf "$skill_dir" "$AGENTS_SKILLS_DIR/"
@@ -128,25 +145,25 @@ done
 echo ""
 echo "--> Setting up Pi Configuration in $PI_AGENT_DIR..."
 if [ ! -f "$PI_AGENT_DIR/settings.json" ]; then
-  cp "$SCRIPT_DIR/pi/settings.clean.json" "$PI_AGENT_DIR/settings.json"
+  cp "$BUNDLE_DIR/pi/settings.clean.json" "$PI_AGENT_DIR/settings.json"
   echo "  ✓ Initialized $PI_AGENT_DIR/settings.json"
 else
   echo "  ✓ $PI_AGENT_DIR/settings.json already exists (left untouched)"
 fi
 
 if [ ! -f "$PI_AGENT_DIR/AGENTS.md" ]; then
-  cp "$SCRIPT_DIR/pi/AGENTS.md" "$PI_AGENT_DIR/AGENTS.md"
+  cp "$BUNDLE_DIR/pi/AGENTS.md" "$PI_AGENT_DIR/AGENTS.md"
   echo "  ✓ Installed $PI_AGENT_DIR/AGENTS.md"
 fi
 
 if [ ! -f "$PI_AGENT_DIR/APPEND_SYSTEM.md" ]; then
-  cp "$SCRIPT_DIR/pi/APPEND_SYSTEM.md" "$PI_AGENT_DIR/APPEND_SYSTEM.md"
+  cp "$BUNDLE_DIR/pi/APPEND_SYSTEM.md" "$PI_AGENT_DIR/APPEND_SYSTEM.md"
   echo "  ✓ Installed $PI_AGENT_DIR/APPEND_SYSTEM.md"
 fi
 
 for cfg in open-tui.json optimizer.json sol-pi.json; do
-  if [ ! -f "$PI_AGENT_DIR/$cfg" ] && [ -f "$SCRIPT_DIR/pi/$cfg" ]; then
-    cp "$SCRIPT_DIR/pi/$cfg" "$PI_AGENT_DIR/$cfg"
+  if [ ! -f "$PI_AGENT_DIR/$cfg" ] && [ -f "$BUNDLE_DIR/pi/$cfg" ]; then
+    cp "$BUNDLE_DIR/pi/$cfg" "$PI_AGENT_DIR/$cfg"
     echo "  ✓ Installed $PI_AGENT_DIR/$cfg"
   fi
 done
@@ -154,7 +171,7 @@ done
 # 10. Install VS Code / Cursor Extension
 echo ""
 echo "--> Installing Cairn VS Code extension..."
-VSIX_FILE="$SCRIPT_DIR/vscode/cairn-0.2.1.vsix"
+VSIX_FILE="$BUNDLE_DIR/vscode/cairn-0.2.1.vsix"
 INSTALLED_IDE=0
 
 if command -v code >/dev/null 2>&1; then

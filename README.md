@@ -51,15 +51,15 @@ pi-toolkit-bundle/
 
 ## 安装方式
 
-### 方式 A：完整一键安装脚本（推荐）
+### 方式 A：免 Clone 远程一键安装（推荐）
 
-直接克隆本仓库并运行 `install.sh`：
+无需手动 `git clone`，直接在终端执行一条命令，全自动拉取并完成所有环境与扩展配置：
 
 ```bash
-git clone https://github.com/yangkunyi/pi-toolkit-bundle.git
-cd pi-toolkit-bundle
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/yangkunyi/pi-toolkit-bundle/main/install.sh | bash
 ```
+
+*(也可以手动克隆后运行 `./install.sh`)*
 
 **`install.sh` 会自动为您完成以下所有工作**：
 1. 检查 Node.js 环境（>= 18）。
